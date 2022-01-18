@@ -1,5 +1,6 @@
 const express = require('express')
 const bodyParser = require('body-parser')
+const moment = require('moment')
 const { Op } = require("sequelize")
 const { sequelize } = require('./model')
 const { getProfile } = require('./middleware/getProfile')
@@ -14,7 +15,7 @@ app.set('models', sequelize.models)
  * Returns contract with id if profile is part of contract
  * @returns contract by id
  */
-app.get('/contracts/:id', getProfile, async (req, res) =>{
+app.get('/contracts/:id', getProfile, async (req, res) => {
     const { Contract } = req.app.get('models')
     const { id } = req.params
 
@@ -35,7 +36,7 @@ app.get('/contracts/:id', getProfile, async (req, res) =>{
  * Returns all contracts for the current profile
  * @returns contracts by authenticated id
  */
- app.get('/contracts', getProfile, async (req, res) =>{
+ app.get('/contracts', getProfile, async (req, res) => {
     const { Contract } = req.app.get('models')
     const { id } = req.profile
 
@@ -62,7 +63,7 @@ app.get('/contracts/:id', getProfile, async (req, res) =>{
  * Returns all unpaid jobs for the current profile
  * @returns jobs by authenticated id
  */
- app.get('/jobs/unpaid', getProfile, async (req, res) =>{
+ app.get('/jobs/unpaid', getProfile, async (req, res) => {
     const { Contract, Job } = req.app.get('models')
     const { id } = req.profile
 
@@ -98,7 +99,7 @@ app.get('/contracts/:id', getProfile, async (req, res) =>{
  * Pays a job with given id if balance is >= amount
  * @returns null
  */
- app.post('/jobs/:job_id/pay', getProfile, async (req, res) =>{
+ app.post('/jobs/:job_id/pay', getProfile, async (req, res) => {
     const { Job, Contract, Profile } = req.app.get('models')
     const { job_id } = req.params
     const { id } = req.profile
@@ -146,7 +147,7 @@ app.get('/contracts/:id', getProfile, async (req, res) =>{
  * Deposit to balance of authenticated profile
  * @returns null
  */
- app.post('/balances/deposit/:userId', async (req, res) =>{
+ app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
     const { Job, Contract, Profile } = req.app.get('models')
     const { userId } = req.params
     const { amount } = req.body
@@ -182,6 +183,75 @@ app.get('/contracts/:id', getProfile, async (req, res) =>{
 
         return res.status(204).end()
     } catch(e) { return res.status(500).json(err) }
+})
+
+app.get('/admin/best-profession', getProfile, async (req, res) => {
+    const { Job, Contract, Profile } = req.app.get('models')
+
+    const start = moment(req.query.start).toDate()
+    const end = moment(req.query.end).toDate()
+
+    if (!start || !end) return res.status(400).end()
+
+    const aggregate = await Job.findOne({
+        where: {
+            paymentDate: {[Op.between]: [ start, end ]}
+        },
+        attributes: [[sequelize.fn('sum', sequelize.col('price')), 'total']],
+        include : [
+            {
+                model : Contract,
+                attributes: [],
+                include : [
+                    {
+                        model : Profile,
+                        as: 'Contractor',
+                        attributes: ['profession']
+                    }
+                ]
+            }
+        ],
+        raw: true,
+        group : ['profession' ]
+    })
+
+    return res.json(aggregate)
+})
+
+app.get('/admin/best-clients', getProfile, async (req, res) => {
+    const { Job, Contract, Profile } = req.app.get('models')
+
+    const start = moment(req.query.start).toDate()
+    const end = moment(req.query.end).toDate()
+
+    if (!start || !end) return res.status(400).end()
+
+    const aggregate = await Job.findAll({
+        where: {
+            paymentDate: {[Op.between]: [ start, end ]},
+            paid: true
+        },
+        attributes: [[sequelize.fn('sum', sequelize.col('price')), 'total']],
+        include : [
+            {
+                model : Contract,
+                attributes: [],
+                include : [
+                    {
+                        model : Profile,
+                        as: 'Client',
+                        attributes: ['firstName', 'lastName']
+                    }
+                ]
+            }
+        ],
+        raw: true,
+        order: sequelize.literal('total desc'),
+        group : ['profession' ],
+        limit: req.query.limit || 2
+    })
+
+    return res.json(aggregate)
 })
 
 module.exports = app
