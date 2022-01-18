@@ -1,0 +1,28 @@
+{
+  "name": "deel-task",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "express": "4.17.1",
+    "sequelize": "^6.3.4",
+    "sqlite3": "^4.0.1"
+  },
+  "scripts": {
+    "start": "nodemon ./src/server.js",
+    "seed": "node ./scripts/seedDb.js",
+    "test": "npm run seed && c8 mocha ./tests/unit.test.js"
+  },
+  "devDependencies": {
+    "c8": "^7.11.0",
+    "chai": "^4.3.4",
+    "concurrently": "4.1.0",
+    "mocha": "^9.1.4",
+    "nodemon": "1.19.1",
+    "supertest": "^6.2.1"
+  },
+  "engines": {
+    "node": ">=10.16.3"
+  },
+  "engineStrict": true
+}
